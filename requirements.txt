@@ -1,0 +1,4 @@
+basc-py4chan
+textblob
+
+# python -m textblob.download_corpora
