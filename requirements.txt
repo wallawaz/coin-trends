@@ -1,4 +1,6 @@
 basc-py4chan
+bs4
+flask
 textblob
 
 # python -m textblob.download_corpora

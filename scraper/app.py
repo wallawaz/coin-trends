@@ -1,166 +1,60 @@
-import basc_py4chan
-from datetime import datetime, timedelta
-import os
-import time
-import random
-from requests.exceptions import HTTPError
-import sqlite3
-
-from scraper.utils import cursor_execute
+import flask
+from flask import g, jsonify
+from time import sleep
 
 
-def utc_to_datetime(x):
-    try:
-        x = datetime.utcfromtimestamp(int(x))
-    except ValueError:
-        x = datetime.strptime(x, "%Y-%m-%d %H:%M:%S")
-    return x
+def create_app(sa):
 
-class FourChanBoardScraper:
+    app = flask.Flask(
+        __name__,
+        template_folder="templates",
+        static_folder="static",
+    )
 
-    THREAD_THRESHOLD = 210
-    CACHE_THRESHOLD = 1200
+    @app.errorhandler(404)
+    def page_not_found(error):
+        return flask.render_template("404.html")
 
-    def __init__(self, board):
-        self.board = basc_py4chan.Board(board)
-        self.threads = []
-        self.last_clear_cache = datetime.now()
-        self.idx = None
+    @app.errorhandler(500)
+    def interval_server_error(error):
+        return flask.render_template("500.html")
     
-    def connect_to_db(self):
-        db_path = os.getenv("FOUR_CHAN_DB", "four_chan.sqlite")
-        self.db = sqlite3.connect(db_path, check_same_thread=False)
+    @app.route("/top_icos")
+    def top_icos():
+        """
+        (last_post, thread_id, subject, post_count)
+        """
+        results = sa.get_top_ico_threads()
 
-    def reset(self):
-        self.board.clear_cache()
-        self.threads = self.board.get_all_threads()
-        self.idx = None
+        output = {"top_icos": []}
+        for result in results:
 
-    def update_idx(self):
-        """Update the index in self.threads"""
-        if not self.idx:
-            self.idx = len(self.threads) - 1
-            return
+            ts, thread_id, subject, post_count = result
+            output["top_icos"].append({
+                "last_post": str(ts),
+                "thread_id": thread_id,
+                "subject": subject,
+                "post_count": post_count,
+            })
 
-        self.idx = self.idx - 1
-        if self.idx < 0:
-            self.idx = len(self.threads) - 1
+        return jsonify(output)
 
-    def get_thread(self, thread_id):
-        query = "SELECT thread_id, last_post from threads where thread_id = ?"
-        with cursor_execute(self.db, query, params=[thread_id]) as curr:
-            thread = curr.fetchone()
-            if thread:
-                return (thread[0], utc_to_datetime(thread[1]))
-            
-        return None
+    @app.route("/posts_by_thread/<int:thread_id>")
+    def posts_by_thread(thread_id):
+        results = sa.get_posts_by_thread(thread_id)
+        columns = ["post_id", "created_at", "comment"]
+        output = {"columns": columns, "rows": []}
 
-    def update_thread(self):
-        self.update_idx()
-        thread = self.threads[self.idx]
-        
-        #meta_thread = MetaThread(
-        #    thread.id,
-        #    datetime.now(),
-        #    thread
-        #)  
+        for result in results:
+            d = dict.fromkeys(columns)
+            for i, value in enumerate(result):
+                d[columns[i]] = value
+            output["rows"].append(d)
 
-        existing_thread = self.get_thread(thread.id)
-        if existing_thread:
-            if ((datetime.now() - existing_thread[-1]).seconds
-                > self.THREAD_THRESHOLD):
-                self.threads[self.idx] = thread
-                ins = self._insert_posts(
-                    thread,
-                    last_post=existing_thread[-1]
-                )
+        return jsonify(output)
 
-        else:
-            print("new thread: ", thread.id)
-            self.threads[self.idx] = thread
-            updated_thread = self._insert_new_thread(thread)
-            if updated_thread:
-                ins = self._insert_posts(updated_thread)
-            
+    @app.route("/")
+    def index():
+        return flask.render_template("dev.html")
     
-    def _insert_new_thread(self, thread):
-        try:
-            thread.update()
-        except HTTPError as e:
-            print(e)
-            time.sleep(3)
-            return None
-
-        last_post = sorted(
-            (p.timestamp for p in thread.posts),
-            reverse=True
-        )
-        last_post = last_post[0]
-        subject = thread.topic.subject
-
-        insert_stmt = (
-            "INSERT OR REPLACE INTO threads (thread_id, last_post, subject) "
-            "VALUES (?, ?, ?);"
-        )
-        params = [thread.id, last_post, subject]
-        with cursor_execute(self.db, insert_stmt, params=params) as curr:
-            _ = curr.rowcount
-
-        return thread
-
-
-    def _insert_posts(self, thread, last_post=None):
-        records = []
-        max_fetched_post = datetime(1970, 1, 1)
-        ins = 0
-            
-        insert_posts_stmt = (
-            "INSERT INTO posts (post_id, thread_id, created_at, comment) "
-            "VALUES (?, ?, ?, ?);" 
-        )
-        if last_post:
-            print ("{}: posts must be > {}".format(thread.id, last_post))
-            try:
-                thread.update()
-            except HTTPError as e:
-                print(e)
-                time.sleep(3)
-                return 0
-        
-        for post in thread.posts:
-            utc_dt = utc_to_datetime(post.timestamp)
-            if utc_dt > max_fetched_post:
-                max_fetched_post = utc_dt
-
-            # post for this thread we have not seen before
-            if not last_post or (last_post and utc_dt > last_post):
-                records.append(
-                    (post.number, thread.id, utc_dt, post.text_comment)
-                )
-
-        for record in records:
-            with cursor_execute(self.db, insert_posts_stmt, params=record) as curr:
-                ins = curr.rowcount
-
-        if last_post and max_fetched_post > last_post:
-            update_stmt = "UPDATE threads SET last_post = ? WHERE thread_id = ?"
-            params = [max_fetched_post, thread.id]
-            with cursor_execute(self.db, update_stmt, params=params) as curr:
-                _ = curr.rowcount
-
-        return ins
-
-    def run(self):
-        self.connect_to_db()
-        
-        while True:
-            if not self.threads:
-                print("reset: no threads")
-                self.reset()
-
-            if (datetime.now() - self.last_clear_cache).seconds > self.CACHE_THRESHOLD:
-                print("reset: CACHE_THRESHOLD")
-                self.reset()
-
-            self.update_thread()
-            time.sleep(1.5)
+    return app

@@ -1,53 +1,17 @@
 import bs4
 from datetime import datetime
-import os
 import re
 import requests
-import sqlite3
+
+from ..base import Base
 
 
-DB_PATH = os.getenv("FOUR_CHAN_DB", "four_chan.sqlite")
-DB = sqlite3.connect(DB_PATH, check_same_thread=False)
-
-from scraper.utils import cursor_execute
-
-ticker_url = "https://coinmarketcap.com/all/views/all/"
-
-def get_tickers_rows():
-    response = requests.get(ticker_url)
-    soup = bs4.BeautifulSoup(response.content, "html.parser")
-    table = soup.find("table", {"id": "currencies-all"})
-    trs = table.find_all("tr")
-    # remove header
-    _ = trs.pop(0)
-    return trs
-
-def insert_ticker(record):
-    # symbol, name
-    params = (record[0], record[1])
-    insert_stmt = "INSERT OR REPLACE INTO tickers (symbol, name) VALUES (?, ?)"
-
-    with cursor_execute(DB, insert_stmt, params) as curr:
-        inserted = curr.rowcount
-
-def insert_ticker_stats(record):
-    params = [record[i] for i in range(2,9)]
-    params = [record[0], datetime.now()] + params
-
-    insert_stmt = (
-        "INSERT INTO ticker_stats (symbol, ts, cap, price_usd, circ_supply, "
-        "volume_24, change_hr, change_day, change_week) VALUES "
-        "(?, ?, ?, ?, ?, ?, ?, ?, ?); "
-    )
-    with cursor_execute(DB, insert_stmt, params=params) as curr:
-        ins = curr.rowcount
-
-
-def update(trs):
+class TickerUpdater(Base):
+    TICKER_URL = "https://coinmarketcap.com/all/views/all/"
 
     # Each search tuple consists of:
     # target_table, target_column, bs4-html-element, bs4-html-element-class
-    searches = {
+    SEARCHES = {
         0: ("tickers", "symbol", "span", {"class": "currency-symbol"}),
         1: ("tickers", "name", "a", {"class": "currency-name-container"}),
         2: ("ticker_stats", "cap", "td", {"class": "no-wrap market-cap text-right"}),
@@ -58,66 +22,124 @@ def update(trs):
         7: ("ticker_stats", "change_day", "td", {}),
         8: ("ticker_stats", "change_week", "td", {}),
     }
-    decimal_columns = ("price_usd", "change_hr", "change_day", "change_week")
-    
-    for tr in trs:
+    DECIMAL_COLUMNS = ("price_usd", "change_hr", "change_day", "change_week")
 
-        record = dict.fromkeys(searches.keys())
-        for idx in sorted(searches.keys()):
-            
-            table, column, elem, d = searches[idx]
 
-            # change attributes cannot be guaranteed to always be the same class
-            if idx >= 6:
-                match = tr.find_all("td")
+    def __init__(self):
+        super(TickerUpdater, self).__init__()
+        self.trs = None
+        self.inserted = 0
+
+    def get_tickers_rows(self):
+        response = requests.get(self.TICKER_URL)
+        soup = bs4.BeautifulSoup(response.content, "html.parser")
+        table = soup.find("table", {"id": "currencies-all"})
+        trs = table.find_all("tr")
+        # remove header
+        _ = trs.pop(0)
+        self.trs = trs
+
+    def insert_ticker(self, record):
+        # symbol, name
+        params = (record[0], record[1])
+        insert_stmt = "INSERT OR REPLACE INTO tickers (symbol, name) VALUES (?, ?)"
+
+        with self.cursor_execute(self.db, insert_stmt, params) as curr:
+            inserted = curr.rowcount
+
+    def insert_ticker_stats(self, record):
+        params = [record[i] for i in range(2,9)]
+        params = [record[0], datetime.now()] + params
+
+        insert_stmt = (
+            "INSERT INTO ticker_stats (symbol, ts, cap, price_usd, circ_supply, "
+            "volume_24, change_hr, change_day, change_week) VALUES "
+            "(?, ?, ?, ?, ?, ?, ?, ?, ?); "
+        )
+        with self.cursor_execute(self.db, insert_stmt, params=params) as curr:
+            inserted = curr.rowcount
+
+    def search_trs(self):
+        if not self.trs:
+            return None
+
+        for tr in self.trs:
+            record = dict.fromkeys(self.SEARCHES.keys())
+
+            for idx in sorted(self.SEARCHES.keys()):
+                table, column, elem, d = self.SEARCHES[idx]
+
+                # change_hr|day|week attributes cannot be guaranteed to always be the same class
+                if idx >= 6:
+                    match = tr.find_all("td")
+
+                    if match:
+                        match = match[-3:]
+                        match = match[idx - 6]
+
+                else:
+                    match = tr.find_next(elem, d)
 
                 if match:
-                    match = match[-3:]
-                    match = match[idx - 6]
+                    record[idx] = match.text
 
-            else:
-                match = tr.find_next(elem, d)
+            yield record
 
-            if match:
-                match = match.text
-                
-                # all columns are numeric besides these
-                if column not in ("symbol", "name") and "change" not in column:
-                    match = re.sub("[^0-9]", "", match)
+    def parse_record(self, record):
+        # all columns are numeric besides these
 
-                if column in decimal_columns:
-                    match = match.replace("%", "")
-                    match = match.replace("$", "")
-                    try:
-                        match = float(match) * 0.01
-                    except ValueError:
-                        match = None
+        out = {}
+        for i, match in record.items():
+            column = self.SEARCHES[i][1]
 
-                record[idx] = match
+            if column not in ("symbol", "name") and column not in self.DECIMAL_COLUMNS:
+                match = re.sub("[^0-9]", "", match)
 
-        # We at least have the ticker symbol
-        if record[0]:
-            insert_ticker(record)
-            insert_ticker_stats(record)
+            if column in self.DECIMAL_COLUMNS:
+                match = match.replace("%", "")
+                match = match.replace("$", "")
+                try:
+                    match = float(match)
+                except ValueError:
+                    match = None
 
-def get_max_ts():
-    query = "SELECT MAX(ts) FROM ticker_stats"
-    with cursor_execute(DB, query) as curr:
-        result = curr.fetchone()
-        return result[0]
+                if match and "change" in column:
+                    match = match * 0.01
 
-def number_of_new_records(ts):
-    if ts is None:
-        ts = datetime(1970, 1, 1)
-    query = """
-        SELECT COUNT(ts) FROM ticker_stats WHERE ts > ?
-    """
-    with cursor_execute(DB, query, params=[ts]) as curr:
-        return curr.fetchone()[0]
-    
-if __name__ == "__main__":
-    ts_prior = get_max_ts()
-    rows = get_tickers_rows()
-    update(rows)
-    new_records = number_of_new_records(ts_prior)
-    print(f"{new_records} records inserted")
+            out[i] = match
+        return out
+
+    def get_latest_ticker_stats(self):
+        query = "SELECT MAX(ts) FROM ticker_stats"
+        with self.cursor_execute(self.db, query) as curr:
+            result = curr.fetchone()
+            return result[0]
+
+    def get_tickers(self):
+        query = "SELECT symbol FROM tickers"
+        with self.cursor_execute(self.db, query) as curr:
+            results = curr.fetchall()
+            return set((r[0] for r in results))
+
+    def _run(self):
+
+        tickers_prior = self.get_tickers()
+        latest_ticker_stat = self.get_latest_ticker_stats()
+
+        # set self.trs
+        self.get_tickers_rows()
+
+        for record in self.search_trs():
+            record = self.parse_record(record)
+
+            if record[0]:
+                self.insert_ticker(record)
+                self.insert_ticker_stats(record)
+                self.inserted += 1
+
+        tickers_added = self.get_tickers() - tickers_prior
+        if tickers_added:
+            tickers_added = ",".join(tickers_added)
+            print(f"Added new tickers: {tickers_added}")
+
+        print("Added {} new ticker_stats".format(self.inserted))
