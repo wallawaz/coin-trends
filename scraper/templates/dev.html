@@ -10,6 +10,7 @@
     <script src="//d3js.org/d3.v4.min.js"></script>
     <script type="text/javascript" src="../static/wrap.js"></script>
     <script type="text/javascript" src="../static/createTable.js"></script>
+    <link rel="stylesheet" type="text/css" href="../static/style.css">
     <style>
         /*.bar { fill: steelblue; }*/
     </style>
@@ -69,15 +70,12 @@
                 .attr("fill", function(d) { return colorScale(d.post_count) });
                
             bars.on("click", function(bar) {
-
                 d3.select("#bottom_table_container").select("table").remove();
-
                 d3.json("/posts_by_thread/" + bar.thread_id, function(error, json) {
                     current_bottom_table.columns = json.columns;
                     current_bottom_table.rows = [];
                     json.rows.forEach(r => current_bottom_table.rows.push(r));
                 });
-
                 var table, thead, tbody, rows, cells = createTable(current_bottom_table, "bottom_table_container");
             });
 
