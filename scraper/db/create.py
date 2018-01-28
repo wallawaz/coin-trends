@@ -24,9 +24,22 @@ create_statements = [
         thread_id INTEGER,
         created_at TIMESTAMP,
         comment TEXT,
+        is_parsed BOOLEAN DEFAULT 0,
         PRIMARY KEY (post_id, thread_id),
         FOREIGN KEY (thread_id) REFERENCES threads (thread_id)
     );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS post_sentiment (
+        post_id INTEGER,
+        symbol TEXT,
+        mentions REAL,
+        sentiment REAL,
+        polarity REAL,
+        PRIMARY KEY (post_id, symbol),
+        FOREIGN KEY (post_id) REFERENCES posts (post_id),
+        FOREIGN KEY (symbol) REFERENCES tickers (symbol)
+    )
     """,
     """
     CREATE TABLE IF NOT EXISTS tickers (

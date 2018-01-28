@@ -124,18 +124,21 @@ class FourChanBoardScraper(Base):
 
             # post for this thread we have not seen before
             if not last_post or (last_post and utc_dt > last_post):
+                post_comment = post.text_comment.replace("\n", " ").rstrip()
                 records.append(
-                    (post.number, thread.id, utc_dt, post.text_comment)
+                    (post.number, thread.id, utc_dt, post_comment)
                 )
 
-        for record in records:
-            with self.cursor_execute(self.db, insert_posts_stmt, params=record) as curr:
-                ins = curr.rowcount
+        #for record in records:
+        #    with self.cursor_execute(self.db_safe, insert_posts_fromstmt, params=record) as curr:
+        #        ins = curr.rowcount
+        with self.cursor_execute(self.db, insert_posts_stmt, params=records, many=True) as curr:
+            ins = curr.rowcount
 
         if last_post and max_fetched_post > last_post:
             update_stmt = "UPDATE threads SET last_post = ? WHERE thread_id = ?"
             params = [max_fetched_post, thread.id]
-            with self.cursor_execute(self.db, update_stmt, params=params) as curr:
+            with self.cursor_execute(self.db_safe, update_stmt, params=params) as curr:
                 _ = curr.rowcount
 
         return ins

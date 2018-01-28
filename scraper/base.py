@@ -12,6 +12,8 @@ class Base:
     
     def connect_to_db(self):
         self.db = sqlite3.connect(self.db_path, check_same_thread=False)
+        self.db_safe = sqlite3.connect(self.db_path, check_same_thread=True)
+
 
     def reset(self):
         pass

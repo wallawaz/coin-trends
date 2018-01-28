@@ -1,9 +1,12 @@
 from contextlib import contextmanager
 
 @contextmanager
-def cursor_execute(connection, sql, params=[]):
+def cursor_execute(connection, sql, params=[], many=False):
     curr = connection.cursor()
-    curr.execute(sql, params)
+    if many:
+        curr.executemany(sql, params)
+    else:
+        curr.execute(sql, params)
     connection.commit()
     yield curr
     curr.close()
