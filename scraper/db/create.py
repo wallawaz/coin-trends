@@ -67,7 +67,7 @@ TABLES = {
             FOREIGN KEY (symbol) REFERENCES tickers (symbol) 
         );
         """
-    )
+    ),
     "ticker_stats": (
         "DROP TABLE IF EXISTS ticker_stats;",
         """
@@ -85,6 +85,7 @@ TABLES = {
             FOREIGN KEY (symbol) REFERENCES tickers (symbol)
         );
         """
+    ),
 }
 
 class DBCreator:
