@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import re
 import time
@@ -13,8 +13,9 @@ class SentimentApp(Base):
 
     REFRESH_COIN_THRESHOLD = 3600
 
-    def __init__(self):
+    def __init__(self, update_hourly=False):
         super(SentimentApp, self).__init__()
+        self.update_hourly=update_hourly
 
         # XXX Skip these ticker-symbols as they are too common
         self.skip_tickers = SKIP_TICKERS
@@ -163,7 +164,81 @@ class SentimentApp(Base):
             inserted = curr.fetchall()
         self.post_sentiments = []
 
+    def coin_summary_by_hour(self):
+        symbols = []
+        hours = []
+        
+        q = (
+            "SELECT symbol, sum(mentions_sum) FROM post_sentiment_hourly "
+            "GROUP BY 1 ORDER BY 2 DESC LIMIT 15"
+        )
+        with self.cursor_execute(self.db, q) as curr:
+            for res in curr.fetchall():
+                symbols.append(res[0])
+        
+        q = "SELECT DISTINCT datetime_hr FROM post_sentiment_hourly ORDER BY 1"
+        with self.cursor_execute(self.db, q) as curr:
+            for res in curr.fetchall():
+                hours.append(res[0])
+        
+        q = "SELECT * FROM post_sentiment_hourly order by datetime_hr"
+        with self.cursor_execute(self.db, q) as curr:
+            return (symbols, hours, curr.fetchall())
+
+
+    #XXX move somewhere else?
+    def _update_hourly(self):
+        """Update hourly aggregation of post_sentiments"""
+
+        _fmt = "%Y-%m-%d %H:%M:%S"
+        dt_to_str = lambda x: x.strftime(_fmt)
+        str_to_dt = lambda x: datetime.strptime(x, _fmt)
+
+        one_hour = timedelta(hours=1)
+
+        with self.cursor_execute(self.db, queries.query_min_max_post) as curr:
+            min_max = curr.fetchone()
+        
+        # dict with `start` being the min non aggregated hour of posts with sentiment.
+        # `end` being the max non aggregated hour of a posts with sentiment. 
+        start, end = min_max
+        date_spread = {
+            "start": [
+                str_to_dt(start),
+                start,
+            ],
+            "end": [
+                str_to_dt(end),
+                end,
+            ]
+        }
+
+        insert_hourly_records = []
+        now = datetime.now()
+        print(f"{now}: starting hourly aggregations: {min_max}")
+
+        while date_spread["start"][0] <= date_spread["end"][0]:
+            q = queries.query_symbol_summary_hourly
+            params = [ date_spread["start"][1] for i in range(2) ]
+            with self.cursor_execute(self.db, q, params=params) as curr:
+                insert_hourly_records += curr.fetchall()
+
+            start_plus_one_hour = date_spread["start"][0] + one_hour
+            date_spread["start"] = [start_plus_one_hour, dt_to_str(start_plus_one_hour)]
+
+        # insert all new hourly metrics to `post_sentiment_hr`
+        ins_q = queries.query_insert_hourly_post_stats
+        with self.cursor_execute(self.db, ins_q, params=insert_hourly_records, many=True) as curr:
+            inserted = curr.fetchall()
+
+        end = datetime.now()    
+        print(f"{end}: inserted - {len(insert_hourly_records)}")
+
     def _run(self):
+        if self.update_hourly:
+            self._update_hourly()
+            return 0
+
         self.start_time = datetime.utcnow()
 
         def refresh():

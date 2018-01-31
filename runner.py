@@ -15,6 +15,11 @@ parser.add_argument(
     "-b", "--board", help="name of 4chan board to scrape",
     default="biz",
 )
+parser.add_argument(
+    "--update-hourly", help="update hourly sentiment stats",
+    action="store_true",
+)
+
 parser.add_argument("--drop-first", action="store_true", default=False,
                     help="DROP ALL tables in sqlite db.")
 
@@ -28,7 +33,7 @@ if __name__ == "__main__":
     if args.action == "tickers":
         _app = TickerUpdater()
     if args.action in ("sentiment", "serve"):
-        _app = SentimentApp()
+        _app = SentimentApp(args.update_hourly)
     
     if args.action == "serve":
         _app.connect_to_db()

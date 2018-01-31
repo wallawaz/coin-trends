@@ -34,6 +34,8 @@ SKIP_TICKERS = set([
     "GAME",
     "GAY",
     "GET",
+    "GAIN",
+    "GOD",
     "GOOD",
     "GPU",
     "HAT",

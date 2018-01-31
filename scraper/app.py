@@ -1,3 +1,4 @@
+import itertools
 import flask
 from flask import g, jsonify
 from time import sleep
@@ -53,6 +54,30 @@ def create_app(sa):
 
         return jsonify(output)
 
+
+    @app.route("/coin_summary_by_hour")
+    def coin_summary_by_hour():
+        symbols, hours, results = sa.coin_summary_by_hour()
+        output = {}
+        output["hours"] = ["x"] + hours
+        output["records"] = []
+
+        symbol_dict = { k: [k] for k in dict.fromkeys(symbols)}
+        
+        for symbol in symbol_dict:
+            symbol_dict[symbol] += [0 for i in hours]
+            
+        for rec in results:
+            hour, symbol, mentions = rec[:3]
+            if symbol in symbol_dict:
+                idx = hours.index(hour)
+                symbol_dict[symbol][idx + 1] += mentions
+
+        for k, v in symbol_dict.items():
+            output["records"].append(v)
+
+        return jsonify(output)
+    
     @app.route("/")
     def index():
         return flask.render_template("dev.html")

@@ -7,20 +7,30 @@
     <title>💱CoinTrends💱</title>
 
     <!-- Latest compiled and minified CSS -->
-    <script src="//d3js.org/d3.v4.min.js"></script>
+    <script
+        src="https://code.jquery.com/jquery-3.3.1.min.js"
+        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+        crossorigin="anonymous">
+    </script>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
     <script type="text/javascript" src="../static/wrap.js"></script>
-    <script type="text/javascript" src="../static/createTable.js"></script>
+    
     <link rel="stylesheet" type="text/css" href="../static/style.css">
-    <style>
-        /*.bar { fill: steelblue; }*/
-    </style>
+
+    <!-- BillboardJS -->
+    <script src="../static/billboard.js"></script>
+    <link href="../static/billboard.css" rel="stylesheet">
+    <script type="text/javascript" src="../static/createTable.js"></script>
+    <script type="text/javascript" src="../static/createTimeSeries.js"></script>
 </head>
 <body>
     <script>
         let current_bottom_table = {"columns": [], "rows": []};
         let top_ico_data = [];
+        let tsData = [];
+        
         var margin = {top: 20, right: 20, bottom: 30, left: 40},
-        width = 650 - margin.left - margin.right,
+        width = 400 - margin.left - margin.right,
         height = 400 - margin.top - margin.bottom;
 
         var colorScale = d3.scaleOrdinal(d3.schemeCategory10);
@@ -51,6 +61,7 @@
                 d.post_count = +d.post_count;
                 top_ico_data.push(d);
             });
+            console.log("foo");
 
             // Scale the range of the data in the domains
             x.padding(0.5)
@@ -90,11 +101,52 @@
             svg.append("g")
                 .call(d3.axisLeft(y));
         });
+
+        $.ajax({
+            url: "/coin_summary_by_hour",
+            type: "GET",
+            dataType: "json",
+            success: function(data) {
+            },
+            error: function(req, error) {
+                console.log("error: " + $.stringify(req));
+            }
+        }).then(function(data) {
+            tsData.length = 0;
+            tsData.push(data.hours);
+            data.records.forEach(r => tsData.push(r));
+            const tsChart = bb.generate({
+                data: {
+                    x: "x",
+                    columns: tsData,
+                    xFormat: "%Y-%m-%d %H:%M:%S"
+                },
+                axis: {
+                    x: {
+                        type: "timeseries",
+                        tick : {
+                           format: "%Y-%m-%d %H:%M:%S"
+                        }
+                    }
+                },
+                bindto: "#timeSeriesChart"
+            });
+        });
+
     </script>
-    <table border="0" cellpadding="10" style="overflow-y: scroll;">
-        <tr>
-            <td><div id="bottom_table_container" class="csvTable"></div></td>
-        </tr>
-    </table>
+
+    <div class="container">
+        <div class="flex1">
+            <div id="timeSeriesChart"></div>
+        </div>
+        <div class="flex2">
+            <div id="barChart"></div>
+            <table border="0" cellpadding="1" style="overflow-y: scroll;">
+                <tr>
+                    <td><div id="bottom_table_container" class="csvTable"></div></td>
+                </tr>
+            </table>
+        </div>
+    </div>
 </body>
 </html>
