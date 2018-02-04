@@ -61,8 +61,8 @@ TABLES = {
             datetime_hr TIMESTAMP, 
             symbol TEXT, 
             mentions_sum REAL, 
-            sentiment_sum REAL, 
             polarity_sum REAL, 
+            subjectivity_sum REAL, 
             PRIMARY KEY (datetime_hr, symbol), 
             FOREIGN KEY (symbol) REFERENCES tickers (symbol) 
         );

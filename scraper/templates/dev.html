@@ -61,8 +61,7 @@
                 d.post_count = +d.post_count;
                 top_ico_data.push(d);
             });
-            console.log("foo");
-
+            
             // Scale the range of the data in the domains
             x.padding(0.5)
                 .domain(top_ico_data.map(d => d.subject));
@@ -102,14 +101,15 @@
                 .call(d3.axisLeft(y));
         });
 
+        /* make `hours_back` dynamic */
         $.ajax({
-            url: "/coin_summary_by_hour",
+            url: "/coin_summary_by_hour/1000",
             type: "GET",
             dataType: "json",
             success: function(data) {
             },
             error: function(req, error) {
-                console.log("error: " + $.stringify(req));
+                console.log("error: " + JSON.stringify(error));
             }
         }).then(function(data) {
             tsData.length = 0;

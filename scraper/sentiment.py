@@ -144,9 +144,9 @@ class SentimentApp(Base):
                 record = [post_id, symbol] + [*stats]
                 self.post_sentiments.append(record)
 
-            if symbol not in self.printed_coins:
-                self.printed_coins.add(symbol)
-                print(f"{symbol}: {stats}")
+                if symbol not in self.printed_coins:
+                    self.printed_coins.add(symbol)
+                    print(f"{symbol}: {stats}")
             
             if len(self.post_sentiments) % 100 == 0:
                 self._insert_post_sentiments()
@@ -164,24 +164,37 @@ class SentimentApp(Base):
             inserted = curr.fetchall()
         self.post_sentiments = []
 
-    def coin_summary_by_hour(self):
+    def coin_summary_by_hour(self, hours_back):
         symbols = []
         hours = []
-        
+        where_clause = (
+            "WHERE datetime_hr >= datetime('now', '-{} hour')"
+        ).format(hours_back)
+
         q = (
-            "SELECT symbol, sum(mentions_sum) FROM post_sentiment_hourly "
+            "SELECT symbol, sum(mentions_sum) "
+            "FROM post_sentiment_hourly {} "
             "GROUP BY 1 ORDER BY 2 DESC LIMIT 15"
-        )
+        ).format(where_clause)
+
         with self.cursor_execute(self.db, q) as curr:
             for res in curr.fetchall():
                 symbols.append(res[0])
         
-        q = "SELECT DISTINCT datetime_hr FROM post_sentiment_hourly ORDER BY 1"
+        q = (
+            "SELECT DISTINCT datetime_hr FROM post_sentiment_hourly {} "
+            "ORDER BY datetime_hr"
+        ).format(where_clause)
+
         with self.cursor_execute(self.db, q) as curr:
             for res in curr.fetchall():
                 hours.append(res[0])
         
-        q = "SELECT * FROM post_sentiment_hourly order by datetime_hr"
+        q = (
+            "SELECT * FROM post_sentiment_hourly {} "
+            "ORDER BY datetime_hr "
+        ).format(where_clause)
+
         with self.cursor_execute(self.db, q) as curr:
             return (symbols, hours, curr.fetchall())
 
@@ -195,7 +208,6 @@ class SentimentApp(Base):
         str_to_dt = lambda x: datetime.strptime(x, _fmt)
 
         one_hour = timedelta(hours=1)
-
         with self.cursor_execute(self.db, queries.query_min_max_post) as curr:
             min_max = curr.fetchone()
         
@@ -248,25 +260,25 @@ class SentimentApp(Base):
             
         self.connect_to_db()
         refresh()
-            
-        while True:
-            total_parsed = 0
-            for post_id, post_comment in self.get_posts_non_parsed():
-                parsed = self.parse(self.coins, post_comment)
-                total_parsed += 1
+        
+        # run once now.   
+        # while True:
+        total_parsed = 0
+        for post_id, post_comment in self.get_posts_non_parsed():
+            parsed = self.parse(self.coins, post_comment)
+            total_parsed += 1
 
-                # if parsed in non-empty dict - insert into post_sentiment
-                self.update_post(post_id, parsed)
-                if total_parsed  % 1000 == 0:
-                    print(f"total_parsed: {total_parsed}, last post_id: {post_id}")
+            # if parsed is non-empty dict - insert into post_sentiment
+            self.update_post(post_id, parsed)
+            if total_parsed  % 1000 == 0:
+                print(f"total_parsed: {total_parsed}, last post_id: {post_id}")
 
-            if (datetime.utcnow() - self.coins_last_refreshed).seconds > self.REFRESH_COIN_THRESHOLD:
-                refresh()
+        #if (datetime.utcnow() - self.coins_last_refreshed).seconds > self.REFRESH_COIN_THRESHOLD:
+        #    refresh()
 
-            if self.posts_to_update:
-                self._update_posts_is_parsed()
-            if self.post_sentiments:
-                self._insert_post_sentiments()
-            
-            print("done parsing - sleep 15")
-            time.sleep(15)
+        if self.posts_to_update:
+            self._update_posts_is_parsed()
+        if self.post_sentiments:
+            self._insert_post_sentiments()
+        
+        print(f"parsed: {total_parsed}")

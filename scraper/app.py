@@ -55,9 +55,13 @@ def create_app(sa):
         return jsonify(output)
 
 
-    @app.route("/coin_summary_by_hour")
-    def coin_summary_by_hour():
-        symbols, hours, results = sa.coin_summary_by_hour()
+    @app.route("/coin_summary_by_hour/<int:hours_back>")
+    def coin_summary_by_hour(hours_back):
+        #import ipdb; ipdb.set_trace()
+        if hours_back == 0:
+            hours_back = 6
+
+        symbols, hours, results = sa.coin_summary_by_hour(hours_back)
         output = {}
         output["hours"] = ["x"] + hours
         output["records"] = []

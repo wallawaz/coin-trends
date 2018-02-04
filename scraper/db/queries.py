@@ -1,17 +1,17 @@
 query_all_symbols = "SELECT symbol, name from tickers"
 
 query_duplicate_symbols = (
-   "SELECT symbol, count(name) "
+    "SELECT symbol, count(name) "
     "FROM tickers "
     "GROUP BY symbol "
     "HAVING COUNT(name) > 1"
 )
 query_insert_post_stats = (
-    "INSERT INTO post_sentiment (post_id, symbol, mentions, polarity, subjectivity) "
+    "INSERT OR REPLACE INTO post_sentiment (post_id, symbol, mentions, polarity, subjectivity) "
     "VALUES (?, ?, ?, ?, ?)"
 )
 query_insert_hourly_post_stats = (
-    "INSERT INTO post_sentiment_hourly (datetime_hr, symbol, mentions_sum, polarity_sum, subjectivity_sum) "
+    "INSERT OR REPLACE INTO post_sentiment_hourly (datetime_hr, symbol, mentions_sum, polarity_sum, subjectivity_sum) "
     "VALUES (?, ?, ?, ?, ?)"
 )
 query_ico_threads = (
@@ -24,7 +24,7 @@ query_min_max_post = (
         "datetime(strftime('%Y-%m-%dT%H:00:00', MIN(created_at))) as min, "
         "datetime(strftime('%Y-%m-%dT%H:00:00', MAX(created_at))) as max "
     "FROM posts join post_sentiment USING (post_id) "
-    "WHERE datetime(strftime('%Y-%m-%dT%H:00:00', posts.created_at)) > ( "
+    "WHERE posts.created_at > ( "
         "select coalesce(max(datetime_hr), '1970-01-01') from post_sentiment_hourly "
     ")"
 )
@@ -41,7 +41,7 @@ query_symbol_mentions_within_interval = (
 )
 
 query_symbol_summary_hourly = (
-    "SELECT ? as post_hour, symbol, sum(mentions), sum(sentiment), sum(polarity) "
+    "SELECT ? as post_hour, symbol, sum(mentions), sum(polarity), sum(subjectivity) "
     "FROM posts JOIN post_sentiment USING (post_id)  "
     "WHERE posts.is_parsed = 1 "
     "AND datetime(strftime('%Y-%m-%dT%H:00:00', created_at)) = ? "
