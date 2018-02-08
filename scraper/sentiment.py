@@ -135,7 +135,7 @@ class SentimentApp(Base):
 
     def update_post(self, post_id, parsed):
 
-        self.posts_to_update.append(post_id)
+        self.posts_to_update.append(str(post_id))
         if len(self.posts_to_update) % 100 == 0:
             self._update_posts_is_parsed()
 
@@ -152,9 +152,13 @@ class SentimentApp(Base):
                 self._insert_post_sentiments()
                 
     def _update_posts_is_parsed(self):
+        # note - we need to format this query with `n` number of query-params
         query = queries.query_update_is_parsed
-        post_ids = "({})".format(",".join(str(p) for p in self.posts_to_update))
-        with self.cursor_execute(self.db, query, params=[post_ids]) as curr:
+
+        question_marks = ["?" for p in self.posts_to_update]
+        query = query.format(",".join(question_marks))
+    
+        with self.cursor_execute(self.db, query, params=self.posts_to_update) as curr:
             updated = curr.fetchall()
         self.posts_to_update = []
 

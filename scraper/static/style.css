@@ -64,12 +64,18 @@ input[type=reset],input[type=submit]{-webkit-appearance:button;cursor:pointer;}b
 
 /* We start writing out flexbox here. The above is just page setup */
 .container {
-    display:flex;
+    display: flex;
+    align-items: stretch;
 }
 .flex1 {
-    flex-basis: 600px;
+    flex-basis: 500px;
     flex-grow: 1;
+    align-items: stretch;
+    display: flex;
 }
 .flex2 {
     flex-basis: 400px;
-}  
+    display: flex;
+    flex-direction: column;
+    
+}

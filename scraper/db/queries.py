@@ -64,6 +64,8 @@ query_top_icos = (
     "GROUP BY thread_id "
     "ORDER BY post_count desc LIMIT 10"
 )
+
+# sqlite is dumb, need to include `n` number of `?` query params
 query_update_is_parsed = (
-    "UPDATE posts set is_parsed = 1 WHERE post_id IN (?)"
+    "UPDATE posts set is_parsed = 1 WHERE post_id IN ({})"
 )

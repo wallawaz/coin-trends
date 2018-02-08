@@ -8,7 +8,7 @@ from ..base import Base
 
 class TickerUpdater(Base):
     TICKER_URL = "https://coinmarketcap.com/all/views/all/"
-
+    #XXX convert to use api https://api.coinmarketcap.com/v1/ticker/?start=0&limit=1000
     # Each search tuple consists of:
     # target_table, target_column, bs4-html-element, bs4-html-element-class
     SEARCHES = {

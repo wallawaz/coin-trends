@@ -57,9 +57,8 @@ def create_app(sa):
 
     @app.route("/coin_summary_by_hour/<int:hours_back>")
     def coin_summary_by_hour(hours_back):
-        #import ipdb; ipdb.set_trace()
         if hours_back == 0:
-            hours_back = 6
+            hours_back = 1000
 
         symbols, hours, results = sa.coin_summary_by_hour(hours_back)
         output = {}
