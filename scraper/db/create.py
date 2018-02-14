@@ -97,9 +97,10 @@ class DBCreator:
     def run(self):
         statements = []
         for t in TABLES.keys():
+            table = TABLES[t]
             if self.drop_first:
-                statements.append(tables[0])
-            statements.append(tables[1])
+                statements.append(table[0])
+            statements.append(table[1])
         
         for statement in statements:
             with cursor_execute(self.db, statement) as curr:
