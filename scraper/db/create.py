@@ -81,7 +81,7 @@ TABLES = {
             available_supply NUMERIC,
             total_supply NUMERIC,
             max_supply NUMERIC,
-            24h_volume_usd NUMERIC,
+            volume_24_usd NUMERIC,
             percent_change_1h NUMERIC,
             percent_change_24h NUMERIC,
             percent_change_7d NUMERIC,
