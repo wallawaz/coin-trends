@@ -72,15 +72,19 @@ TABLES = {
         "DROP TABLE IF EXISTS ticker_stats;",
         """
         CREATE TABLE IF NOT EXISTS ticker_stats (
-            symbol TEXT,
             ts TIMESTAMP,
-            cap NUMERIC,
+            last_updated TIMESTAMP,
+            symbol TEXT,
+            market_cap_usd NUMERIC,
             price_usd NUMERIC,
-            circ_supply NUMERIC,
-            volume_24 NUMERIC,
-            change_hr NUMERIC,
-            change_day NUMERIC,
-            change_week NUMERIC,
+            price_btc NUMERIC,
+            available_supply NUMERIC,
+            total_supply NUMERIC,
+            max_supply NUMERIC,
+            24h_volume_usd NUMERIC,
+            percent_change_1h NUMERIC,
+            percent_change_24h NUMERIC,
+            percent_change_7d NUMERIC,
             PRIMARY KEY (symbol, ts),
             FOREIGN KEY (symbol) REFERENCES tickers (symbol)
         );
