@@ -51,7 +51,7 @@ class TickerUpdater(Base):
             to_insert.append(ins)
 
         columns = ",".join(self.TICKER_STATS)
-        columns = columns.replace("git", "volume_24_usd")
+        columns = columns.replace("24h_volume_usd", "volume_24_usd")
         qs = ",".join(["?" for i in range(len(self.TICKER_STATS))])
         insert_stmt = f"INSERT INTO ticker_stats ({columns}) VALUES ({qs});"
         with self.cursor_execute(self.db, insert_stmt, params=to_insert, many=True) as curr:
