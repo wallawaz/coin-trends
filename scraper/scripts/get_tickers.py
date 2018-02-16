@@ -29,6 +29,7 @@ class TickerUpdater(Base):
         super(TickerUpdater, self).__init__()
         self.inserted = 0
         self.start_time = datetime.now()
+        self.seen_symbols = set([])
 
     def get_tickers(self):
         response = requests.get(self.TICKER_API_URL)
@@ -53,7 +54,7 @@ class TickerUpdater(Base):
         columns = ",".join(self.TICKER_STATS)
         columns = columns.replace("24h_volume_usd", "volume_24_usd")
         qs = ",".join(["?" for i in range(len(self.TICKER_STATS))])
-        insert_stmt = f"INSERT INTO ticker_stats ({columns}) VALUES ({qs});"
+        insert_stmt = f"INSERT or REPLACE INTO ticker_stats ({columns}) VALUES ({qs});"
         with self.cursor_execute(self.db, insert_stmt, params=to_insert, many=True) as curr:
             inserted = curr.rowcount
 
@@ -68,9 +69,19 @@ class TickerUpdater(Base):
         with self.cursor_execute(self.db, query) as curr:
             results = curr.fetchall()
             return set((r[0] for r in results))
+    
+    def _remove_duplicates(self, batch):
+        query = "SELECT symbol, ts FROM ticker_stats"
+        with self.cursor_execute(self.db, query) as curr:
+            results = set(curr.fetchall())
+        batch = [b for b in batch if (b["symbol"], self.start_time) not in results]
+        return batch
 
+    def _handle_batch(self, batch):
+        batch = self._remove_duplicates(batch)
+        self.insert_ticker_stats(batch)
+        
     def _run(self):
-
         tickers_in_db = self.get_db_tickers()
         latest_ticker_stat = self.get_latest_ticker_stats()
 
@@ -85,13 +96,13 @@ class TickerUpdater(Base):
                 self.insert_ticker(record)
             
             if len(batch) == 100:
-                self.insert_ticker_stats(batch)
+                self._handle_batch(batch)
                 batch = []
             else:
                 continue
 
         if batch:
-            self.insert_ticker_stats(batch)
+            self._handle_batch(batch)
 
         tickers_added = self.get_db_tickers() - tickers_in_db
         if tickers_added:
