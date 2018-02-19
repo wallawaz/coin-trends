@@ -71,10 +71,10 @@ def create_app(sa):
             symbol_dict[symbol] += [0 for i in hours]
             
         for rec in results:
-            hour, symbol, mentions = rec[:3]
+            hour, symbol, mentions, polarity, subjectivity = rec
             if symbol in symbol_dict:
                 idx = hours.index(hour)
-                symbol_dict[symbol][idx + 1] += mentions
+                symbol_dict[symbol][idx + 1] += mentions * polarity * subjectivity
 
         for k, v in symbol_dict.items():
             output["records"].append(v)

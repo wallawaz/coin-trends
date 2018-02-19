@@ -168,12 +168,13 @@ class SentimentApp(Base):
         symbols = []
         hours = []
         where_clause = (
-            "WHERE datetime_hr >= datetime('now', '-{} hour')"
+            "datetime_hr >= datetime('now', '-{} hour') "
         ).format(hours_back)
 
         q = (
-            "SELECT symbol, sum(mentions_sum) "
-            "FROM post_sentiment_hourly {} "
+            "SELECT symbol, abs(sum(mentions_sum * polarity_sum * subjectivity_sum)) "
+            "FROM post_sentiment_hourly "
+            "WHERE {}"
             "GROUP BY 1 ORDER BY 2 DESC LIMIT 15"
         ).format(where_clause)
 
@@ -182,7 +183,8 @@ class SentimentApp(Base):
                 symbols.append(res[0])
         
         q = (
-            "SELECT DISTINCT datetime_hr FROM post_sentiment_hourly {} "
+            "SELECT DISTINCT datetime_hr FROM post_sentiment_hourly "
+            "WHERE {} "
             "ORDER BY datetime_hr"
         ).format(where_clause)
 
@@ -191,7 +193,8 @@ class SentimentApp(Base):
                 hours.append(res[0])
         
         q = (
-            "SELECT * FROM post_sentiment_hourly {} "
+            "SELECT * FROM post_sentiment_hourly "
+            "WHERE {} "
             "ORDER BY datetime_hr "
         ).format(where_clause)
 

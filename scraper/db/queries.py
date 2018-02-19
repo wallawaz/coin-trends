@@ -62,7 +62,8 @@ query_top_icos = (
     "FROM threads join posts using (thread_id) "
     "WHERE UPPER(threads.subject) LIKE '%ICO%' "
     "GROUP BY thread_id "
-    "ORDER BY post_count desc LIMIT 10"
+    "ORDER BY last_post desc, post_count desc "
+    "LIMIT 5"
 )
 
 # sqlite is dumb, need to include `n` number of `?` query params
