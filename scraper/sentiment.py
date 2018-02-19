@@ -263,7 +263,6 @@ class SentimentApp(Base):
             
         self.connect_to_db()
         refresh()
-        import ipdb; ipdb.set_trace()
         
         # run once now.   
         # while True:
