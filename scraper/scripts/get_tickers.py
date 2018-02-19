@@ -29,8 +29,7 @@ class TickerUpdater(Base):
         super(TickerUpdater, self).__init__()
         self.inserted = 0
         self.start_time = datetime.now()
-        self.seen_symbols = set([])
-
+        
     def get_tickers(self):
         response = requests.get(self.TICKER_API_URL)
         self.tickers = response.json()

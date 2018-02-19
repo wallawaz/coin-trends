@@ -7,7 +7,7 @@ import time
 from textblob import TextBlob
 from .db import queries
 from .base import Base
-from .utils.constants import SKIP_TICKERS
+from .utils.constants import SKIP_NAMES, SKIP_TICKERS
 
 class SentimentApp(Base):
 
@@ -19,12 +19,8 @@ class SentimentApp(Base):
 
         # XXX Skip these ticker-symbols as they are too common
         self.skip_tickers = SKIP_TICKERS
+        self.skip_names = SKIP_NAMES
 
-        self.skip_names = set([
-            "REAL",
-            "FOR",
-            "FORCE",
-        ])
         self.printed_coins = set([])
         self.posts_to_update = []
         self.post_sentiments = []
@@ -86,7 +82,7 @@ class SentimentApp(Base):
                 except ValueError:
                     skip = False
 
-            if skip and name in self.skip_names:
+            if skip and name.upper() in self.skip_names:
                 continue
             factor = 1
             if symbol in self.duplicate_tickers:
@@ -264,6 +260,7 @@ class SentimentApp(Base):
             
         self.connect_to_db()
         refresh()
+        import ipdb; ipdb.set_trace()
         
         # run once now.   
         # while True:
